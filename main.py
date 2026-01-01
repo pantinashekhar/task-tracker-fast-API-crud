@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel
-import pymysql  
+import psycopg2 
+import psycopg2.extras 
 from datetime import date,datetime
 
 app = FastAPI()
@@ -15,17 +16,17 @@ class Task(BaseModel):
 
 
 def get_db_connection():
-        connection =  pymysql.connect(
+        connection =  psycopg2.connect(
         host="localhost",
-        user="root",
+        user="postgres",
         password="Krishna123",    
         database="task_tracker",
-        cursorclass=pymysql.cursors.DictCursor
+        cursor_factory=psycopg2.extras.DictCursor
     )   
         try:
             yield connection
         finally:
-            if connection.open:
+            if not connection.closed:
                 connection.close()
 
 @app.get("/")
@@ -46,9 +47,8 @@ def read_task(task_id: int,conn=Depends(get_db_connection)):
 @app.post("/tasks/", response_model=Task)
 def create_task(task: Task,conn=Depends(get_db_connection)):
     # In a real application, you would save the task to a database
-    
     cursor = conn.cursor()
-    cursor.execute("INSERT INTO tasks (title, description, status, due_date, created_at) VALUES (%s, %s, %s, %s, %s)",
+    cursor.execute("INSERT INTO tasks (title, description, status, due_date, created_at) VALUES (%s, %s, %s, %s, %s) returning *",
                 (task.title, task.description, task.status, task.due_date, task.created_at))
     conn.commit()
     cursor.close()
